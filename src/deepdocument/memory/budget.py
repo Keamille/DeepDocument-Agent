@@ -100,17 +100,34 @@ def estimate_tokens(text: str) -> int:
     """
     估算 token 数
 
-    按 docs/memory.md: 1 英文单词 = 1 token, 1 汉字 = 2 token
+    按 docs/memory.md 的规则：
+    - 一个中日韩统一表意文字计 2 token
+    - 连续的 ASCII 每 4 个字符计 1 token
+    - 其他非 ASCII 字符每个计 2 token
 
     Args:
         text: 文本
 
     Returns:
-        估算的 token 数
+        估算的 token 数（向上取整）
     """
-    chinese_chars = sum(1 for c in text if "一" <= c <= "鿿")
-    english_words = len(text.split())
-    return chinese_chars * 2 + english_words
+    cjk = 0
+    other_non_ascii = 0
+    ascii_chars = 0
+
+    for ch in text:
+        code = ord(ch)
+        if 0x4E00 <= code <= 0x9FFF:  # 中日韩统一表意文字
+            cjk += 1
+        elif code < 128:
+            if not ch.isspace():
+                ascii_chars += 1
+        else:
+            other_non_ascii += 1
+
+    # 连续的 ASCII 每 4 个字符计 1 token，不足 4 个也向上取整
+    ascii_tokens = -(-ascii_chars // 4)  # 向上取整
+    return cjk * 2 + other_non_ascii * 2 + ascii_tokens
 
 
 def truncate_to_budget(text: str, budget: int) -> str:

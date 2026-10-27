@@ -13,14 +13,17 @@ authors = [
     {name = "DeepDocument Team"}
 ]
 dependencies = [
-    "langgraph>=0.2.0",
-    "langchain-core>=0.3.0",
+    "langgraph>=1.0.0",
+    "langgraph-checkpoint-sqlite>=2.0.0",
     "openai>=1.0.0",
     "httpx>=0.27.0",
     "pypdf>=4.0.0",
     "python-docx>=1.0.0",
     "pyyaml>=6.0",
-    "pywebview[qt]>=5.0.0",
+    "python-dotenv>=1.0.0",
+    # Windows 用系统自带的 WebView2，不需要额外的 Qt 运行时
+    "pywebview>=5.0.0; sys_platform == 'win32'",
+    "pywebview[qt]>=5.0.0; sys_platform != 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-deepdocument = "deepdocument.main:main"
+deepdocument = "deepdocument.app:main"
 
 [tool.black]
 line-length = 100

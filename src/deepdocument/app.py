@@ -11,16 +11,12 @@ from pathlib import Path
 import webview
 from dotenv import load_dotenv
 
-from deepdocument.graph.builder import build_graph
+from deepdocument.graph.builder import build_graph, close_checkpointers
 from deepdocument.ui.api import WindowAPI
 
 
-def main():
-    """启动 DeepDocument 桌面应用"""
-    # 加载环境变量
-    load_dotenv()
-
-    # 验证必需的环境变量
+def _check_env():
+    """校验 .env 中必需的三项配置"""
     required_env = ["OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL"]
     missing = [k for k in required_env if not os.getenv(k)]
     if missing:
@@ -28,23 +24,26 @@ def main():
         print("请复制 .env.example 为 .env 并填写配置", file=sys.stderr)
         sys.exit(1)
 
-    # 确保数据目录存在
+
+def _ensure_dirs():
+    """确保数据目录存在"""
     projects_dir = Path("projects")
     projects_dir.mkdir(exist_ok=True)
     (projects_dir / ".gitkeep").touch()
+    Path("skills_user").mkdir(exist_ok=True)
 
-    skills_dir = Path("skills_user")
-    skills_dir.mkdir(exist_ok=True)
 
-    # 构建图
-    graph = build_graph()
+def main():
+    """启动 DeepDocument 桌面应用"""
+    load_dotenv()
+    _check_env()
+    _ensure_dirs()
 
-    # 创建窗口 API
-    api = WindowAPI(graph)
+    # 图按项目懒创建：打开文稿时才编译，thread_id = slug
+    api = WindowAPI(build_graph_fn=build_graph)
 
-    # 启动窗口
     html_path = Path(__file__).parent / "ui" / "index.html"
-    window = webview.create_window(
+    webview.create_window(
         title="DeepDocument",
         url=str(html_path),
         js_api=api,
@@ -53,7 +52,10 @@ def main():
         resizable=True,
     )
 
-    webview.start(debug=os.getenv("DEBUG", "").lower() == "true")
+    try:
+        webview.start(debug=os.getenv("DEBUG", "").lower() == "true")
+    finally:
+        close_checkpointers()
 
 
 if __name__ == "__main__":

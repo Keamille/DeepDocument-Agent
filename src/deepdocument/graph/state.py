@@ -2,7 +2,7 @@
 图状态定义
 """
 
-from typing import TypedDict, Literal, NotRequired
+from typing import Literal, NotRequired, TypedDict
 
 
 class GraphState(TypedDict):
