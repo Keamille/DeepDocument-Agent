@@ -1,0 +1,42 @@
+# DeepDocument
+
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# 环境变量
+.env
+
+# 项目数据
+projects/
+!projects/.gitkeep
+
+# 用户数据
+user_profile.md
+skills_user/
+
+# 检查点
+checkpoints.db
+checkpoints.db-shm
+checkpoints.db-wal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 日志
+*.log
+
+# 本地说明，不纳入版本库
+INSTALL.md
+SKELETON_REPORT.md

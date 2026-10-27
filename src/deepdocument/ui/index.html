@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepDocument</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 左栏：对话 -->
+        <div class="left-pane">
+            <div class="header">
+                <h1>DeepDocument</h1>
+                <div class="project-select">
+                    <select id="project-selector">
+                        <option value="">新建项目</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="messages" id="messages">
+                <!-- 消息动态插入 -->
+            </div>
+
+            <div class="input-area">
+                <div class="context-indicator" id="context-indicator">
+                    <!-- 修订某节时显示 📍 正在修订: {section.title} -->
+                </div>
+                <textarea id="user-input" placeholder="输入消息..." rows="3"></textarea>
+                <button id="send-btn" class="primary-btn">发送</button>
+            </div>
+        </div>
+
+        <!-- 右栏：Markdown 预览 -->
+        <div class="right-pane">
+            <div class="tabs">
+                <button class="tab active" data-tab="outline">大纲</button>
+                <button class="tab" data-tab="sections">正文</button>
+                <button class="tab" data-tab="literature">文献</button>
+                <button class="tab" data-tab="profile">画像</button>
+            </div>
+
+            <div class="tab-content active" id="tab-outline">
+                <div id="outline-view"></div>
+            </div>
+
+            <div class="tab-content" id="tab-sections">
+                <div id="sections-view"></div>
+            </div>
+
+            <div class="tab-content" id="tab-literature">
+                <div id="literature-view"></div>
+            </div>
+
+            <div class="tab-content" id="tab-profile">
+                <div id="profile-view"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认卡模态框 -->
+    <div class="modal" id="confirmation-modal" style="display: none;">
+        <div class="modal-content">
+            <h2 id="modal-title">确认</h2>
+            <div id="modal-body"></div>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="primary-btn">同意</button>
+                <button id="modal-cancel" class="secondary-btn">拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/marked.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
