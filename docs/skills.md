@@ -53,3 +53,5 @@ description: 用户要求相关工作按主张而不是按年份组织时使用
 ## 和用户画像的分工
 
 画像里的一句可能是「相关工作按主张组织」。对应的 skill 才写明先列主张、再放文献。画像整份常驻。skill 正文只在命中时出现。提议 skill 时不要把画像里的短句原样再存一份更长的重复说明，除非里面有可执行的步骤。
+
+Skill 示例里应写明要调用的**工具名**和 JSON 参数，不要再写 `Thought` / `Action` / `Action Input` 三段文本。动作契约以 [agent-loop.md](agent-loop.md) 与 [`llm/tools.py`](../src/deepdocument/llm/tools.py) 的 `ACTION_TOOLS` 为准。

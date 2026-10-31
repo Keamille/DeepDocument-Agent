@@ -1,18 +1,18 @@
 # 代理循环
 
-LangGraph 负责暂停、恢复，以及把唯一的 Action 接到工具。模型每轮只输出一条 ReAct，不在内部连续调用多个工具。
+LangGraph 负责暂停、恢复，以及把唯一的动作接到运行时工具。模型每轮通过 **function calling** 只调用一个白名单工具，不在内部连续调用多个工具。
 
 ## 记忆层
 
 五类记忆放什么、保留多久、其中多少进入模型，都写在 [memory.md](memory.md)。这里只定循环怎么用它们。
 
-`load_memory` 每轮按该文档的 8,000 token 预算从磁盘现装提示，不把历史 Thought 累积进模型。检查点只保留恢复确认卡所需的状态和上一条 Observation。画像是短偏好，skill 是步骤，两者不互相替代。
+`load_memory` 每轮按该文档的 8,000 token 预算从磁盘现装提示，不把历史推理文本累积进模型。检查点只保留恢复确认卡所需的状态和上一条 Observation。画像是短偏好，skill 是步骤，两者不互相替代。
 
 ## 工具层
 
-模型能在 ReAct 里点名的只有下面这些：
+模型能通过 function calling 点名的只有下面这些（与 `llm/tools.py` 里的 `ACTION_TOOLS` 一致）：
 
-| Action | 作用 | 是否暂停 |
+| 工具名 | 作用 | 是否暂停 |
 | --- | --- | --- |
 | `ask_user` | 缺题目、种类或格式文件时提问 | 是 |
 | `search_literature` | 用题目向 OpenAlex 要真实记录（可能少于 8 条） | 是，等勾选 |
@@ -37,22 +37,20 @@ LangGraph 负责暂停、恢复，以及把唯一的 Action 接到工具。模�
 
 `revise_section` 落盘后，图的节点自动调用 `record_decision` 和 `update_profile`。这样一次修订不会再占一轮。`record_decision` 单独使用时，只用于没有改动正文的意见。
 
-## ReAct 输出
+## Function calling
 
-`choose_action` 只接受这一段，然后停住：
+`choose_action` 调用聊天接口时带上全部 `ACTION_TOOLS`，并设置：
 
-```text
-Thought: 还没有已确认文献，不能写正文。
-Action: search_literature
-Action Input: {"query": "检索增强生成在企业知识库中的应用"}
-```
+- `tool_choice="required"`：本轮必须选一个工具
+- `parallel_tool_calls=False`：禁止一次返回多个 call（兼容接口若不支持该参数则省略）
 
-运行时执行该 Action，得到 Observation。需要人看的 Observation 变成确认卡。已经落盘的 Observation 写成文件变更。下一轮提示只带上一条 Observation。
+运行时只取**第一个** `tool_call`，解析 `function.name` 与 `function.arguments`（JSON 对象）。
 
-`Action Input` 是 JSON。解析时：
-- 容忍模型输出 ` ```json ... ``` `，自动剥离代码块标记
-- 用正则提取 `Action Input:` 后面第一个完整的 JSON 对象
-- 解析失败或未知的 Action 名称时，这一轮改为 `ask_user`，不执行写入
+可选的简短理由放在工具参数的 `reason` 字段，或写在 `message.content` 里；窗口可用来展示，不进入下一轮提示预算。
+
+解析失败、没有 tool call、或名字不在白名单时，这一轮改为 `ask_user`，不执行写入。
+
+运行时执行该动作，得到 Observation。需要人看的 Observation 变成确认卡。已经落盘的 Observation 写成文件变更。下一轮提示只带上一条 Observation。
 
 提示各切片的 token 上限见 [memory.md](memory.md)。
 

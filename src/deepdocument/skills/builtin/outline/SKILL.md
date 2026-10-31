@@ -1,8 +1,4 @@
-"""
-内置 skill: 起草大纲
-"""
-
-SKILL = """---
+---
 name: outline
 description: 根据题目和文献起草大纲
 ---
@@ -19,10 +15,12 @@ description: 根据题目和文献起草大纲
    - summary: 总结（单节）
    - report: 引言、主体若干节、结论
    - paper: 摘要、引言、方法、结果、讨论、结论
-4. 输出 Action: update_outline
+4. 调用工具 `update_outline`
 
 # 示例
 
-Action: update_outline
-Action Input: {"titles": ["引言", "主要发现", "局限", "结论"]}
-"""
+调用 `update_outline`，参数：
+
+```json
+{"titles": ["引言", "主要发现", "局限", "结论"], "reason": "按报告结构列出四节"}
+```

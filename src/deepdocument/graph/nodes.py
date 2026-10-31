@@ -9,7 +9,7 @@ import json
 from deepdocument.graph.state import GraphState
 from deepdocument.memory.budget import build_prompt
 from deepdocument.skills.registry import recall_skills
-from deepdocument.llm.client import chat, parse_react
+from deepdocument.llm.client import chat_for_action
 from deepdocument.document.store import (
     load_meta,
     save_meta,
@@ -18,8 +18,8 @@ from deepdocument.document.store import (
     append_decision,
 )
 from deepdocument.document.model import Decision
-from deepdocument.literature.search import search_literature
-from deepdocument.literature.fetch import fetch_source
+from deepdocument.literature.search import search_literature as search_openalex
+from deepdocument.literature.fetch import fetch_source as fetch_literature_source
 
 
 def load_context(state: GraphState) -> dict:
@@ -46,17 +46,14 @@ def choose_action(state: GraphState) -> dict:
     """
     模型选择动作
 
-    按 ReAct 格式解析 Thought、Action、Action Input
+    通过 function calling 从白名单里选一个 tool，解析为动作名和参数。
     """
     messages = [
         {"role": "system", "content": state["last_observation"]},
         {"role": "user", "content": state.get("user_input", "")},
     ]
 
-    response = chat(messages, temperature=0.7)
-
-    # 解析 ReAct
-    action_name, action_input = parse_react(response)
+    action_name, action_input = chat_for_action(messages, temperature=0.3)
 
     return {
         "chosen_action": action_name,
@@ -111,7 +108,7 @@ def search_literature(state: GraphState) -> dict:
     弹出确认卡让用户选择
     """
     query = state["action_input"]["query"]
-    results = search_literature(query, max_results=8)
+    results = search_openalex(query, max_results=8)
 
     if len(results) < 3:
         return {
@@ -147,7 +144,7 @@ def fetch_source(state: GraphState) -> dict:
     abstract = state["action_input"].get("abstract")
     project_slug = state["project_slug"]
 
-    result = fetch_source(lit_id, oa_url, abstract, project_slug)
+    result = fetch_literature_source(lit_id, oa_url, abstract, project_slug)
 
     return {
         "last_observation": f"抓取完成，来源: {result['content_source']}",
@@ -215,10 +212,13 @@ def propose_skill(state: GraphState) -> dict:
 
     弹出确认卡
     """
-    feedback_pattern = state["action_input"]["pattern"]
+    name = state["action_input"].get("name", "new-skill")
+    description = state["action_input"].get("description", "")
+    body = state["action_input"].get("body") or description
 
-    # TODO: 调用模型生成 skill
-    skill_markdown = f"---\nname: new-skill\n---\n\n{feedback_pattern}"
+    skill_markdown = (
+        f"---\nname: {name}\ndescription: {description}\n---\n\n{body}\n"
+    )
 
     card = {
         "card_type": "skill",

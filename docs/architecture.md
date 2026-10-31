@@ -33,7 +33,8 @@ src/deepdocument/
   skills/registry.py
   skills/proposer.py
   skills/builtin/             # outline、draft-section、revise-section
-  llm/client.py
+  llm/client.py               # 对话与 tool call 解析
+  llm/tools.py                # ACTION_TOOLS 与白名单
 projects/<slug>/
   brief.md outline.md sections/ meta.json decisions.jsonl
   literature.jsonl
@@ -71,7 +72,8 @@ class GraphState(TypedDict):
 | `skills/proposer.py` | 起草 skill 文本，不直接写文件 |
 | `memory/budget.py` | 按预算从磁盘拼出本轮提示 |
 | `memory/profile.py` | 把已发生的反馈收成 `user_profile.md` |
-| `llm/client.py` | OpenAI 兼容的对话接口 |
+| `llm/client.py` | OpenAI 兼容对话接口；解析 tool call |
+| `llm/tools.py` | 模型可选动作的 function schema 与白名单 |
 
 ## 图
 

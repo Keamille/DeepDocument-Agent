@@ -9,7 +9,7 @@
 | 语言 | Python 3.14 | 本机虚拟环境已是 3.14。代码只用 3.11 及以上就有的语法，便于以后换解释器 |
 | 图与暂停 | `langgraph` | `interrupt()` 和检查点正好对应确认卡、关窗再开。一轮一个动作由我们自己的节点完成 |
 | 会话存储 | `langgraph-checkpoint-sqlite` | 每个文稿项目一个 `checkpoints.sqlite`，不需要单独安装数据库 |
-| 模型调用 | `openai` 官方 SDK | 节点自己组提示，只需要 OpenAI 兼容的 `base_url`、密钥和模型名。不使用 LangChain 的 Agent、Tool 或 Retriever |
+| 模型调用 | `openai` 官方 SDK | 节点自己组提示；选动作用 Chat Completions 的 function calling（`tools` / `tool_choice`）。不使用 LangChain 的 Agent 或 Retriever |
 | 窗口 | `pywebview` | 打开的是系统窗口。Windows 上用 WebView2。Python 与页面通过 `js_api` 调用，不监听端口 |
 | 窗口内页面 | HTML、CSS、少量 JavaScript | 左栏对话、右栏 Markdown、确认卡用静态页面就够。不引入 React、Vue，也不需要 Node |
 | Markdown 预览 | 仓库内的 `marked` 单文件 | 右栏要把 `sections/*.md` 显示出来。单文件放进仓库，窗口不访问外网 CDN |
