@@ -1,86 +1,93 @@
 """
 Word 导出
 
-以 template.docx 为底稿，套入节正文，输出 export.docx。
+以 template.docx 为底稿（不修改原件），套入节正文，覆盖写入 export.docx。
+规则见 docs/document-model.md。
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 
 from docx import Document
-from docx.shared import Pt
 from docx.enum.style import WD_STYLE_TYPE
 
-from deepdocument.document.store import load_meta, load_section, load_literature
-from deepdocument.document.model import Brief
+from deepdocument.document.model import Brief, Literature
+from deepdocument.document.store import load_literature, load_meta, load_section, project_dir
+
+EXPORTABLE_STATUSES = frozenset({"outlined", "draft", "accepted"})
 
 
-def export_docx(project_slug: str, brief: Brief):
+def export_docx(project_slug: str, brief: Brief | None = None) -> Path:
     """
-    导出 Word 文档
+    导出 Word，返回 export.docx 路径
 
     Args:
         project_slug: 项目 slug
-        brief: Brief 对象，包含 citation_style
+        brief: 可选；为空则从磁盘读取
     """
-    template_path = Path("projects") / project_slug / "template.docx"
-    export_path = Path("projects") / project_slug / "export.docx"
+    from deepdocument.document.store import load_brief
 
-    # 加载模板或创建空白文档
+    if brief is None:
+        brief = load_brief(project_slug)
+    if brief is None:
+        raise FileNotFoundError(f"项目缺少 brief.md: {project_slug}")
+
+    root = project_dir(project_slug)
+    template_path = root / "template.docx"
+    export_path = root / "export.docx"
+    export_path.parent.mkdir(parents=True, exist_ok=True)
+
     if template_path.exists():
         doc = Document(str(template_path))
+        # 清空示例正文，保留样式
+        body = doc.element.body
+        for child in list(body):
+            body.remove(child)
     else:
         doc = Document()
 
-    # 清空现有内容（保留样式）
-    for element in doc.element.body:
-        doc.element.body.remove(element)
+    heading1 = _find_style(doc, ["Heading 1", "标题 1"])
+    heading2 = _find_style(doc, ["Heading 2", "标题 2"])
+    normal = _find_style(doc, ["Normal", "正文"])
 
-    # 添加标题
-    heading_style = _find_style(doc, ["Heading 1", "标题 1"])
-    if heading_style:
-        doc.add_heading(brief.title, level=1).style = heading_style
-    else:
-        doc.add_heading(brief.title, level=1)
+    title_para = doc.add_heading(brief.title, level=1)
+    if heading1:
+        title_para.style = heading1
 
-    # 添加各节正文
     meta = load_meta(project_slug)
     for section in meta.get("sections", []):
-        if section["status"] != "accepted":
+        status = section.get("status", "empty")
+        if status not in EXPORTABLE_STATUSES:
             continue
 
-        # 节标题
-        section_heading_style = _find_style(doc, ["Heading 2", "标题 2"])
-        if section_heading_style:
-            doc.add_heading(section["title"], level=2).style = section_heading_style
-        else:
-            doc.add_heading(section["title"], level=2)
+        heading_text = section.get("title", "")
+        if status == "draft":
+            heading_text = f"{heading_text}（草稿）"
+        elif status == "outlined":
+            heading_text = f"{heading_text}（待写）"
 
-        # 节正文
-        content = load_section(project_slug, section["id"])
-        normal_style = _find_style(doc, ["Normal", "正文"])
+        h = doc.add_heading(heading_text, level=2)
+        if heading2:
+            h.style = heading2
+
+        content = load_section(project_slug, section["id"]).strip()
+        if not content:
+            continue
         for para_text in content.split("\n\n"):
-            p = doc.add_paragraph(para_text.strip())
-            if normal_style:
-                p.style = normal_style
+            text = para_text.strip()
+            if not text:
+                continue
+            p = doc.add_paragraph(text)
+            if normal:
+                p.style = normal
 
-    # 添加参考文献
-    _add_references(doc, project_slug, brief.citation_style)
-
-    # 保存
+    _add_references(doc, project_slug, brief.citation_style, heading1)
     doc.save(str(export_path))
+    return export_path
 
 
 def _find_style(doc: Document, names: list[str]) -> str | None:
-    """
-    查找第一个存在的样式名称
-
-    Args:
-        doc: Document 对象
-        names: 候选样式名称列表
-
-    Returns:
-        存在的样式名称；都不存在返回 None
-    """
     styles = {s.name for s in doc.styles if s.type == WD_STYLE_TYPE.PARAGRAPH}
     for name in names:
         if name in styles:
@@ -88,51 +95,45 @@ def _find_style(doc: Document, names: list[str]) -> str | None:
     return None
 
 
-def _add_references(doc: Document, project_slug: str, citation_style: str):
-    """
-    添加参考文献列表
-
-    Args:
-        doc: Document 对象
-        project_slug: 项目 slug
-        citation_style: 引用格式（默认 APA 7th）
-    """
-    literature = load_literature(project_slug)
-    accepted = [lit for lit in literature if lit.status == "accepted"]
+def _add_references(
+    doc: Document,
+    project_slug: str,
+    citation_style: str,
+    heading_style: str | None,
+) -> None:
+    accepted = load_literature(project_slug, status="accepted")
     if not accepted:
         return
 
-    # 添加参考文献标题
-    doc.add_heading("参考文献", level=1)
+    h = doc.add_heading("参考文献", level=1)
+    if heading_style:
+        h.style = heading_style
 
-    # 按作者姓氏排序
-    accepted.sort(key=lambda lit: lit.authors[0] if lit.authors else "")
-
-    # 格式化每条文献
+    accepted = sorted(
+        accepted,
+        key=lambda lit: (lit.authors[0] if lit.authors else "", lit.year or 0),
+    )
     for lit in accepted:
-        ref_text = _format_citation(lit, citation_style)
-        doc.add_paragraph(ref_text)
+        doc.add_paragraph(_format_citation(lit, citation_style))
 
 
-def _format_citation(lit, style: str) -> str:
-    """
-    格式化单条引用
+def _format_citation(lit: Literature, style: str) -> str:
+    """第一版简单拼接；APA / GB 细规则后续再补"""
+    authors = lit.authors or ["佚名"]
+    if len(authors) <= 3:
+        authors_str = ", ".join(authors)
+    else:
+        authors_str = ", ".join(authors[:3]) + ", et al."
 
-    Args:
-        lit: Literature 对象
-        style: 引用格式
-
-    Returns:
-        格式化的引用文本
-    """
-    # TODO: 支持 APA 7th、GB/T 7714-2015 等格式
-    # 第一版简单拼接：作者. (年份). 标题. DOI
-    authors_str = ", ".join(lit.authors[:3])
-    if len(lit.authors) > 3:
-        authors_str += ", et al."
-
-    parts = [f"{authors_str}. ({lit.year}). {lit.title}."]
+    year = lit.year if lit.year is not None else "n.d."
+    parts = [f"{authors_str}. ({year}). {lit.title}."]
+    if lit.venue:
+        parts.append(f" {lit.venue}.")
     if lit.doi:
-        parts.append(f"https://doi.org/{lit.doi}")
+        parts.append(f" https://doi.org/{lit.doi}")
+    elif lit.url:
+        parts.append(f" {lit.url}")
 
-    return " ".join(parts)
+    # style 参数留给后续分支；当前输出对 APA / 简易 GB 都可读
+    _ = style
+    return "".join(parts)

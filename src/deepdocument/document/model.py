@@ -1,70 +1,87 @@
 """
 文稿数据模型
+
+字段与 docs/document-model.md 对齐。磁盘序列化由 store 负责。
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from typing import Literal
+
+SectionStatus = Literal["empty", "outlined", "draft", "accepted"]
+DocKind = Literal["summary", "report", "paper"]
+LiteratureStatus = Literal["accepted", "rejected"]
+ContentSource = Literal["fulltext", "abstract", "user_file", "unavailable"]
+EvidenceType = Literal["core", "related", "contrast"]
 
 
 @dataclass
 class Brief:
-    """brief.md 的结构"""
+    """brief.md"""
 
     title: str
-    kind: Literal["summary", "report", "paper"]
+    kind: DocKind = "report"
     audience: str = ""
-    constraints: list[str] = None
-    citation_style: str = "APA 7th"
-
-    def __post_init__(self):
-        if self.constraints is None:
-            self.constraints = []
+    constraints: list[str] = field(default_factory=list)
+    citation_style: str = "APA"
 
 
 @dataclass
 class Section:
-    """一节的元数据"""
+    """meta.json 里一节的元数据；正文在 sections/<id>.md"""
 
     id: str
     title: str
-    status: Literal["pending", "draft", "accepted"]
-    gist: str = ""  # 要旨，最多 20 字
+    status: SectionStatus = "empty"
+    gist: str = ""  # 要旨，提示里最多约 20 字
 
 
 @dataclass
 class Literature:
-    """一条文献记录"""
+    """literature.jsonl 一行"""
 
-    id: str  # OpenAlex work ID
+    id: str
     title: str
-    authors: list[str]
-    year: int
-    doi: str | None
-    oa_url: str | None
-    status: Literal["candidate", "accepted", "rejected"]
-    content_source: Literal["oa_pdf", "abstract", "user_file", "unavailable"] | None
-    evidence_type: Literal["core", "related", "contrast"] | None
+    authors: list[str] = field(default_factory=list)
+    year: int | None = None
+    status: LiteratureStatus = "accepted"
+    openalex_id: str | None = None
+    doi: str | None = None
+    venue: str | None = None
+    url: str | None = None
+    abstract: str | None = None
+    content_source: ContentSource | None = None
+    local_path: str | None = None
+    evidence_type: EvidenceType | None = None
+
+
+@dataclass
+class Source:
+    """sources/<id>.md 三截"""
+
+    id: str
+    content_source: ContentSource
+    card: str = ""
+    excerpt: str = ""
+    archive: str = ""
 
 
 @dataclass
 class Decision:
-    """一条反馈"""
+    """decisions.jsonl 一条；磁盘字段为 at / section / text"""
 
     timestamp: str
-    section_id: str | None
-    feedback: str  # 用户的意见，最多 30 字进入提示
+    feedback: str
+    section_id: str | None = None
 
 
 @dataclass
 class Profile:
-    """用户画像"""
+    """全局 user_profile.md 的内存形状（读写在 memory/profile）"""
 
     language: str = "中文"
     tone: str = ""
     structure: str = ""
     citation: str = ""
-    rejects: list[str] = None
-
-    def __post_init__(self):
-        if self.rejects is None:
-            self.rejects = []
+    rejects: list[str] = field(default_factory=list)

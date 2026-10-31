@@ -45,9 +45,9 @@ constraints:
 }
 ```
 
-`status` 取 `empty`、`outlined`、`draft`、`accepted`。`cursor` 是当前正在写的节。`gist` 在该节落盘时写成不超过 20 字的要旨，供以后的提示使用，不替代正文。一轮最多展开 10 节的要旨，其余节只留 id 和状态。
+`status` 取 `empty`、`outlined`、`draft`、`accepted`（不再使用 `pending`）。`cursor` 是当前正在写的节。`gist` 在该节落盘时写成不超过 20 字的要旨，供以后的提示使用，不替代正文。一轮最多展开 10 节的要旨，其余节只留 id 和状态。
 
-默认只动 `cursor`，或下一节 `empty`。用户点名某一节时，这一轮改为修订那一节。
+`save_outline` 默认会同步 `meta.json`：按标题重建节列表，已有节的 `status` / `gist` 尽量保留。默认只动 `cursor`，或下一节 `empty` / `outlined`。用户点名某一节时，这一轮改为修订那一节。
 
 ## literature.jsonl
 
@@ -69,7 +69,7 @@ constraints:
 }
 ```
 
-`content_source` 取 `fulltext`、`abstract` 或 `user_file`。用户附上的本地文件可以没有 `openalex_id`，但要有 `local_path`。模型只能引用 `accepted` 条目。
+`content_source` 取 `fulltext`、`abstract`、`user_file` 或 `unavailable`。用户附上的本地文件可以没有 `openalex_id`，但要有 `local_path`。模型只能引用 `status` 为 `accepted` 的条目。确认卡上的候选在写入前不落盘；确认后用 `save_literature` 一次写入 accepted / rejected。
 
 模型提示里的文献卡片不是这个 JSON 的全文。卡片只有 `id`、缩短的标题、年份和 `content_source`。`abstract` 字段留在文件里，正文进入提示时走 `sources/<id>.md` 的摘录。
 
@@ -89,7 +89,7 @@ content_source: fulltext
 
 ## excerpt
 
-供当前节引用的摘录。一轮提示最多带 3 篇，每篇最多 1,200 token。超出的部分留在本文件，并在提示里注明已截断。预算见 [memory.md](memory.md)。
+供当前节引用的摘录。一轮提示最多带 3 篇，每篇最多 2,400 token。超出的部分留在本文件，并在提示里注明已截断。预算见 [memory.md](memory.md)。
 
 ## archive
 

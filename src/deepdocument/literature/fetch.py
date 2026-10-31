@@ -34,7 +34,7 @@ def fetch_source(
     # TODO: 若抽不到文本（扫描件），改用 abstract
     # TODO: 若都没有，标注「无可用文本」
     # TODO: 写入 sources/<id>.md（## card、## excerpt、## archive 三段）
-    # TODO: excerpt 最多 1200 token
+    # TODO: excerpt 最多 2400 token（见 docs/memory.md）
 
     return {"content_source": "unavailable", "excerpt_length": 0}
 

@@ -20,11 +20,7 @@ from openai import APIConnectionError, APITimeoutError, OpenAI, RateLimitError
 from openai import APIStatusError
 
 from deepdocument.llm.tools import ACTION_TOOLS, ACTION_WHITELIST
-
-# 上下文至少 16,384 token，见 docs/memory.md
-MIN_CONTEXT_TOKENS = 16_384
-# 输出预留 2,048 token
-MAX_OUTPUT_TOKENS = 2_048
+from deepdocument.memory.budget import MAX_OUTPUT_TOKENS, MIN_CONTEXT_TOKENS
 
 DEFAULT_TIMEOUT = 60.0
 

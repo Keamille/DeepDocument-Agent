@@ -34,7 +34,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=
 ```
 
-模型上下文至少 16,384 token。提示仍按 [memory.md](memory.md) 装到 8,000 token，不因为换了更长窗口就多放原文。
+模型上下文至少 32,768 token。提示仍按 [memory.md](memory.md) 装到 16,000 token，不因为换了更长窗口就多放原文。
 
 不使用 `tiktoken`。它只对部分 OpenAI 模型准确，换到其他兼容接口就会数错。有该模型自己的 tokenizer 时用它，否则用 `memory.md` 里的估算。
 

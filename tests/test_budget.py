@@ -4,7 +4,24 @@
 
 import pytest
 
-from deepdocument.memory.budget import estimate_tokens, truncate_to_budget
+from deepdocument.memory.budget import (
+    BUDGET,
+    MAX_OUTPUT_TOKENS,
+    MIN_CONTEXT_TOKENS,
+    PROMPT_TOKEN_BUDGET,
+    estimate_tokens,
+    truncate_to_budget,
+)
+
+
+def test_budget_matches_32k_design():
+    """提示切片合计 16k，模型上下文下限 32k"""
+    assert MIN_CONTEXT_TOKENS == 32_768
+    assert PROMPT_TOKEN_BUDGET == 16_000
+    assert MAX_OUTPUT_TOKENS == 4_096
+    assert sum(BUDGET.values()) == PROMPT_TOKEN_BUDGET
+    assert BUDGET["excerpts"] == 6_800
+    assert BUDGET["current_section"] == 2_000
 
 
 def test_estimate_tokens_cjk():
@@ -42,12 +59,12 @@ def test_estimate_tokens_monotonic():
 
 
 def test_truncate_to_budget():
-    """超出预算时截断并加省略号"""
+    """超出预算时截断并标明全文在文件中"""
     text = "这是一段很长的文本" * 100
     truncated = truncate_to_budget(text, 100)
 
     assert len(truncated) < len(text)
-    assert truncated.endswith("...")
+    assert "已截断" in truncated
 
 
 def test_truncate_within_budget_keeps_text():
