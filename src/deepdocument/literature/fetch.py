@@ -101,10 +101,13 @@ def _download_pdf_text(oa_url: str) -> str | None:
             resp = client.get(oa_url)
             resp.raise_for_status()
             content_type = (resp.headers.get("content-type") or "").lower()
-            if "pdf" not in content_type and not oa_url.lower().endswith(".pdf"):
-                # 可能是落地页而非 PDF
-                if not resp.content.startswith(b"%PDF"):
-                    return None
+            # 非 PDF Content-Type / 扩展名时，再用魔数确认是否真是 PDF
+            if (
+                "pdf" not in content_type
+                and not oa_url.lower().endswith(".pdf")
+                and not resp.content.startswith(b"%PDF")
+            ):
+                return None
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 tmp.write(resp.content)
                 tmp_path = Path(tmp.name)
