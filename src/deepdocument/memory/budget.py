@@ -44,20 +44,32 @@ MAX_SKILL_BODY_TOKENS = 600
 assert sum(BUDGET.values()) == PROMPT_TOKEN_BUDGET
 
 
-def build_prompt(project_slug: str, recalled_skills: list[str]) -> str:
+def build_prompt(
+    project_slug: str,
+    recalled_skills: list[str],
+    *,
+    observation: str = "",
+) -> str:
     """
     组装本轮提示
 
     Args:
         project_slug: 项目 slug
         recalled_skills: 召回的 skill 名称列表（最多 2 个）
-
-    Returns:
-        完整提示文本
+        observation: 上一轮 Observation，写入 observation 切片
     """
+    from deepdocument.memory.profile import profile_to_prompt
+    from deepdocument.skills.registry import scan_skills
+
     sections = []
 
-    # 1. brief
+    sections.append(
+        truncate_to_budget(
+            "# 系统规则\n\n一轮只调用一个工具。没有摘录支撑的断言不写。不编造文献。",
+            BUDGET["system"],
+        )
+    )
+
     brief = load_brief(project_slug)
     if brief:
         text = (
@@ -66,23 +78,21 @@ def build_prompt(project_slug: str, recalled_skills: list[str]) -> str:
         )
         sections.append(truncate_to_budget(text, BUDGET["brief"]))
 
-    # 2. 大纲
     outline = load_outline(project_slug)
     if outline:
         text = "# 大纲\n\n" + "\n".join(f"- {title}" for title in outline)
         sections.append(truncate_to_budget(text, BUDGET["outline"]))
 
-    # 3. 文献卡片
     literature = load_literature(project_slug, status="accepted")[:MAX_LITERATURE_CARDS]
     if literature:
         cards = []
         for lit in literature:
-            source = lit.content_source or lit.evidence_type or "unknown"
-            cards.append(f"{lit.id} | {lit.title} | {lit.year} | {source}")
+            source = lit.content_source or "unknown"
+            short_title = lit.title if len(lit.title) <= 40 else lit.title[:37] + "…"
+            cards.append(f"{lit.id} | {short_title} | {lit.year} | {source}")
         text = "# 文献卡片\n\n" + "\n".join(cards)
         sections.append(truncate_to_budget(text, BUDGET["literature_cards"]))
 
-    # 4. 各节要旨
     meta = load_meta(project_slug)
     if meta.get("sections"):
         marks = {
@@ -101,7 +111,6 @@ def build_prompt(project_slug: str, recalled_skills: list[str]) -> str:
         text = "# 各节要旨\n\n" + "\n".join(gists)
         sections.append(truncate_to_budget(text, BUDGET["sections_gist"]))
 
-    # 5. 摘录（按需装入；此处占位，由调用方或后续实现填入）
     sections.append(
         truncate_to_budget(
             f"# 摘录\n\n（按需装入，最多 {MAX_EXCERPT_SOURCES} 篇，每篇 ≤ {EXCERPT_PER_SOURCE} token）",
@@ -109,27 +118,34 @@ def build_prompt(project_slug: str, recalled_skills: list[str]) -> str:
         )
     )
 
-    # 6. 最近反馈
     decisions = load_decisions(project_slug, limit=MAX_DECISIONS)
     if decisions:
         feedback_lines = [f"- {dec.feedback[:30]}" for dec in decisions]
         text = "# 最近反馈\n\n" + "\n".join(feedback_lines)
         sections.append(truncate_to_budget(text, BUDGET["decisions"]))
 
-    # 7. 用户画像
-    # TODO: 从 user_profile.md 读取后按 BUDGET["profile"] 裁剪
     sections.append(
-        truncate_to_budget("# 用户画像\n\n（从全局文件读取）", BUDGET["profile"])
+        truncate_to_budget(
+            "# 用户画像\n\n" + profile_to_prompt(),
+            BUDGET["profile"],
+        )
     )
 
-    # 8. Skill
     if recalled_skills:
-        text = f"# Skill\n\n（已召回：{', '.join(recalled_skills)}；每份正文 ≤ {MAX_SKILL_BODY_TOKENS} token）"
+        catalog = scan_skills()
+        skill_blocks = []
+        for name in recalled_skills[:2]:
+            skill = catalog.get(name)
+            if not skill:
+                continue
+            body = truncate_to_budget(skill.get("content", ""), MAX_SKILL_BODY_TOKENS)
+            skill_blocks.append(f"## {name}\n\n{body}")
+        text = "# Skill\n\n" + "\n\n".join(skill_blocks)
         sections.append(truncate_to_budget(text, BUDGET["skills"]))
 
-    # 9. 上一轮观察
+    obs = observation.strip() or "（无）"
     sections.append(
-        truncate_to_budget("# Observation\n\n上一轮的结果", BUDGET["observation"])
+        truncate_to_budget(f"# Observation\n\n{obs}", BUDGET["observation"])
     )
 
     return "\n\n".join(sections)

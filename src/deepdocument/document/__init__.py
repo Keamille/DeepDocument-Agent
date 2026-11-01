@@ -12,6 +12,8 @@ from deepdocument.document.store import (
     append_decision,
     append_literature,
     create_project,
+    get_sections,
+    list_source_ids,
     load_brief,
     load_decisions,
     load_literature,
@@ -26,6 +28,8 @@ from deepdocument.document.store import (
     save_outline,
     save_section,
     save_source,
+    update_literature,
+    update_section_meta,
 )
 from deepdocument.document.exporter import export_docx
 
@@ -40,6 +44,8 @@ __all__ = [
     "append_literature",
     "create_project",
     "export_docx",
+    "get_sections",
+    "list_source_ids",
     "load_brief",
     "load_decisions",
     "load_literature",
@@ -54,4 +60,6 @@ __all__ = [
     "save_outline",
     "save_section",
     "save_source",
+    "update_literature",
+    "update_section_meta",
 ]

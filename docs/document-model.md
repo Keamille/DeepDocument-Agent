@@ -106,7 +106,7 @@ content_source: fulltext
 {"at": "2026-10-27T18:00:00+08:00", "section": "summary", "text": "按结论归类，不要逐篇罗列"}
 ```
 
-原文全部保留。进入提示的是最近 5 条，每条最多 30 字。更早的意见已经收成全局用户画像。字数见 [memory.md](memory.md)。
+原文全部保留。进入提示的是最近 10 条，每条最多 30 字。更早的意见已经收成全局用户画像。字数见 [memory.md](memory.md)。
 
 ## template.docx 与 export.docx
 
@@ -118,7 +118,7 @@ content_source: fulltext
 - 状态为 `outlined`、`draft`、`accepted` 的节按顺序写入。
 - `draft` 的标题标明草稿。
 - `empty` 的节不写入。
-- 文末参考文献只列 `accepted` 文献，按 `brief.md` 中的 `citation_style` 格式化（默认 APA 7th，按作者姓氏字母排序）。
+- 文末参考文献只列 `accepted` 文献。第一版按作者姓氏字母排序后做简易著录（作者、年、题名、出处、DOI/URL）；`citation_style`（`APA` / `GB/T 7714-2015`）预留字段，细规则后续再分岔，不假装已实现完整 APA 7 / GB。
 - 同一路径每次覆盖。
 - 没有模板时使用空白文档。
 - 格式是 `.docx`，不生成旧版二进制 `.doc`。
@@ -134,4 +134,4 @@ content_source: fulltext
 
 ## 全局文件
 
-`user_profile.md` 和 `skills_user/` 不属于某一个 slug。画像字段见 [memory.md](memory.md)，skill 字段见 [skills.md](skills.md)。
+`user_profile.md` 和 `skills_user/` 不属于某一个 slug，不由 `document/store` 读写。内存形状可用 `document.model.Profile`；读写在 `memory/profile`。画像字段见 [memory.md](memory.md)，skill 字段见 [skills.md](skills.md)。

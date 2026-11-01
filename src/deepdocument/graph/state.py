@@ -1,46 +1,35 @@
 """
 图状态定义
+
+与 docs/architecture.md、docs/agent-loop.md 对齐。
+提示与观察分开：prompt_text 是本轮现装的系统提示，last_observation 是上一轮/本轮观察。
 """
 
 from typing import Literal, NotRequired, TypedDict
 
 
 class GraphState(TypedDict):
-    """
-    LangGraph 状态
+    """LangGraph 状态"""
 
-    按 docs/architecture.md 的定义
-    """
-
-    # 项目标识
     project_slug: str
-
-    # 当前处理的节 id
     cursor: str
-
-    # 待确认的动作（interrupt 时设置）
-    pending_confirmation: NotRequired[dict | None]
-
-    # 文件快照（用于检测外部修改）
-    file_snapshots: NotRequired[dict[str, dict]]
-
-    # 上一轮的观察结果
     last_observation: str
 
-    # 用户输入
+    pending_confirmation: NotRequired[dict | None]
+    file_snapshots: NotRequired[dict[str, str]]
     user_input: NotRequired[str]
-
-    # 模型选择的动作
+    prompt_text: NotRequired[str]
     chosen_action: NotRequired[str]
-
-    # 动作参数
     action_input: NotRequired[dict]
 
 
 class ConfirmationCard(TypedDict):
-    """确认卡数据"""
+    """确认卡 payload（也可经 interrupt() 传出）"""
 
-    card_type: Literal["outline", "literature", "section", "skill"]
-    diff: NotRequired[str]  # outline 的 diff
-    items: NotRequired[list[dict]]  # literature 的列表
-    markdown: NotRequired[str]  # section 或 skill 的内容
+    card_type: Literal["question", "outline", "literature", "skill"]
+    question: NotRequired[str]
+    diff: NotRequired[str]
+    titles: NotRequired[list[str]]
+    items: NotRequired[list[dict]]
+    markdown: NotRequired[str]
+    name: NotRequired[str]

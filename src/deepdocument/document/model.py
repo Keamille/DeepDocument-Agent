@@ -78,7 +78,10 @@ class Decision:
 
 @dataclass
 class Profile:
-    """全局 user_profile.md 的内存形状（读写在 memory/profile）"""
+    """全局 user_profile.md 的内存形状。
+
+    不属于 projects/<slug>/；磁盘读写在 memory/profile，本模块只提供类型。
+    """
 
     language: str = "中文"
     tone: str = ""

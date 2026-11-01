@@ -233,17 +233,22 @@ def save_section(
     gist: str | None = None,
 ) -> None:
     """写正文，并把该节 meta 标成 draft（或传入的 status）"""
+    meta = load_meta(project_slug)
+    found = False
+    for item in meta.get("sections", []):
+        if item.get("id") != section_id:
+            continue
+        found = True
+        item["status"] = status
+        if gist is not None:
+            item["gist"] = gist[:20]
+        break
+    if not found:
+        raise KeyError(f"未知节 id: {section_id}")
+
     path = project_dir(project_slug) / "sections" / f"{section_id}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
-
-    meta = load_meta(project_slug)
-    for item in meta.get("sections", []):
-        if item.get("id") == section_id:
-            item["status"] = status
-            if gist is not None:
-                item["gist"] = gist[:20]
-            break
     save_meta(project_slug, meta)
 
 
@@ -415,7 +420,7 @@ def _section_body(markdown: str, name: str) -> str:
 # ---------- decisions ----------
 
 
-def load_decisions(project_slug: str, limit: int | None = 5) -> list[Decision]:
+def load_decisions(project_slug: str, limit: int | None = 10) -> list[Decision]:
     path = project_dir(project_slug) / "decisions.jsonl"
     records = read_jsonl(str(path))
     if limit is not None:

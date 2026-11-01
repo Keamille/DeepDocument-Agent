@@ -118,7 +118,10 @@ def _add_references(
 
 
 def _format_citation(lit: Literature, style: str) -> str:
-    """第一版简单拼接；APA / GB 细规则后续再补"""
+    """简易著录：作者、年、题名、出处、DOI/URL。
+
+    不是完整 APA 7 / GB/T 7714；style 仅预留，第一版忽略。
+    """
     authors = lit.authors or ["佚名"]
     if len(authors) <= 3:
         authors_str = ", ".join(authors)
@@ -134,6 +137,5 @@ def _format_citation(lit: Literature, style: str) -> str:
     elif lit.url:
         parts.append(f" {lit.url}")
 
-    # style 参数留给后续分支；当前输出对 APA / 简易 GB 都可读
-    _ = style
+    _ = style  # 预留：APA / GB 细规则后续分岔
     return "".join(parts)
