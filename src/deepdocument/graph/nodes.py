@@ -18,6 +18,7 @@ from deepdocument.document.store import (
     append_decision,
     load_meta,
     load_section,
+    load_source,
     save_outline,
     save_section,
     update_section_meta,
@@ -25,8 +26,13 @@ from deepdocument.document.store import (
 from deepdocument.graph.state import GraphState
 from deepdocument.literature.fetch import fetch_source as fetch_literature_source
 from deepdocument.literature.search import search_literature as search_openalex
-from deepdocument.llm.client import chat_for_action
-from deepdocument.memory.budget import build_prompt
+from deepdocument.llm.client import LLMError, chat, chat_for_action
+from deepdocument.memory.budget import (
+    EXCERPT_PER_SOURCE,
+    MAX_EXCERPT_SOURCES,
+    build_prompt,
+    truncate_to_budget,
+)
 from deepdocument.memory.profile import update_profile
 from deepdocument.skills.registry import recall_skills
 
@@ -195,33 +201,11 @@ def draft_or_revise(state: GraphState) -> dict:
 
     try:
         if action == "revise_section":
-            content = load_section(project_slug, section_id)
-            feedback = action_input.get("feedback", "")
-            # TODO: 调用模型按反馈修订；骨架先标注反馈
-            content = (content or "").rstrip()
-            if feedback:
-                content = (
-                    f"{content}\n\n（修订意图: {feedback}）\n"
-                    if content
-                    else f"（修订意图: {feedback}）\n"
-                )
-            gist = feedback[:20] if feedback else None
-            save_section(project_slug, section_id, content, status="draft", gist=gist)
-            append_decision(
-                project_slug,
-                Decision(
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                    section_id=section_id,
-                    feedback=feedback[:30] if feedback else "修订",
-                ),
-            )
-            update_profile(feedback or "修订")
-            obs = f"已修订节: {section_id}"
-        else:
-            # TODO: 根据 sources 摘录调用模型生成正文
-            content = "（草稿占位：待根据摘录生成）\n"
-            save_section(project_slug, section_id, content, status="draft", gist="草稿占位")
-            obs = f"已起草节: {section_id}"
+            return _run_revise_section(state, project_slug, section_id, action_input)
+        # TODO: 根据 sources 摘录调用模型生成正文
+        content = "（草稿占位：待根据摘录生成）\n"
+        save_section(project_slug, section_id, content, status="draft", gist="草稿占位")
+        obs = f"已起草节: {section_id}"
     except KeyError:
         return {"last_observation": f"未知节 id: {section_id}"}
 
@@ -231,6 +215,115 @@ def draft_or_revise(state: GraphState) -> dict:
         pass
 
     return {"last_observation": obs}
+
+
+def _run_revise_section(
+    state: GraphState,
+    project_slug: str,
+    section_id: str,
+    action_input: dict,
+) -> dict:
+    """按反馈调用模型修订一节，落盘后记决策与画像。"""
+    feedback = (action_input.get("feedback") or "").strip()
+    if not feedback:
+        return {"last_observation": "缺少 feedback，无法修订"}
+
+    current = load_section(project_slug, section_id)
+    title = _section_title(project_slug, section_id)
+    source_ids = list(action_input.get("source_ids") or [])[:MAX_EXCERPT_SOURCES]
+    excerpts = _collect_excerpts(project_slug, source_ids)
+
+    try:
+        revised = _revise_section_text(
+            title=title,
+            content=current,
+            feedback=feedback,
+            excerpts=excerpts,
+        )
+    except LLMError as exc:
+        return {"last_observation": f"修订失败（模型错误）: {exc}"}
+
+    revised = (revised or "").strip()
+    if not revised:
+        return {"last_observation": f"修订失败: 模型未返回正文（{section_id}）"}
+
+    gist = feedback[:20]
+    save_section(project_slug, section_id, revised + "\n", status="draft", gist=gist)
+    append_decision(
+        project_slug,
+        Decision(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            section_id=section_id,
+            feedback=feedback[:30],
+        ),
+    )
+    update_profile(feedback)
+
+    try:
+        export_docx(project_slug)
+    except FileNotFoundError:
+        pass
+
+    return {"last_observation": f"已修订节: {section_id}"}
+
+
+def _section_title(project_slug: str, section_id: str) -> str:
+    for item in load_meta(project_slug).get("sections") or []:
+        if item.get("id") == section_id:
+            return str(item.get("title") or section_id)
+    return section_id
+
+
+def _collect_excerpts(project_slug: str, source_ids: list[str]) -> list[tuple[str, str]]:
+    """装入最多 3 篇摘录；(id, excerpt_text)。"""
+    collected: list[tuple[str, str]] = []
+    for source_id in source_ids:
+        source = load_source(project_slug, source_id)
+        if source is None or not source.excerpt.strip():
+            continue
+        excerpt = truncate_to_budget(source.excerpt.strip(), EXCERPT_PER_SOURCE)
+        collected.append((source_id, excerpt))
+        if len(collected) >= MAX_EXCERPT_SOURCES:
+            break
+    return collected
+
+
+def _revise_section_text(
+    *,
+    title: str,
+    content: str,
+    feedback: str,
+    excerpts: list[tuple[str, str]],
+) -> str:
+    """调用 chat() 按反馈改写一节；只返回正文。"""
+    if excerpts:
+        excerpt_block = "\n\n".join(
+            f"### {sid}\n\n{text}" for sid, text in excerpts
+        )
+    else:
+        excerpt_block = "（本轮未提供摘录；不要新增无依据的断言。）"
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是文稿修订助手。只按用户反馈修改给定节的正文。"
+                "保留未被指出问题的段落；不要扩写无关内容。"
+                "没有摘录支撑的新断言不要写。"
+                "只输出修订后的 Markdown 正文，不要前言、标题或解释。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"节标题: {title}\n\n"
+                f"用户反馈:\n{feedback}\n\n"
+                f"现有正文:\n{content.strip() or '（空）'}\n\n"
+                f"相关摘录:\n{excerpt_block}\n"
+            ),
+        },
+    ]
+    return chat(messages, temperature=0.3).strip()
 
 
 def accept_section(state: GraphState) -> dict:
