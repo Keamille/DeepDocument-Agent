@@ -16,6 +16,7 @@ from deepdocument.document.exporter import export_docx
 from deepdocument.document.model import Decision
 from deepdocument.document.store import (
     append_decision,
+    load_brief,
     load_meta,
     load_section,
     load_source,
@@ -201,24 +202,57 @@ def draft_or_revise(state: GraphState) -> dict:
 
     try:
         if action == "revise_section":
-            return _run_revise_section(state, project_slug, section_id, action_input)
-        # TODO: 根据 sources 摘录调用模型生成正文
-        content = "（草稿占位：待根据摘录生成）\n"
-        save_section(project_slug, section_id, content, status="draft", gist="草稿占位")
-        obs = f"已起草节: {section_id}"
+            return _run_revise_section(project_slug, section_id, action_input)
+        return _run_draft_section(project_slug, section_id, action_input)
     except KeyError:
         return {"last_observation": f"未知节 id: {section_id}"}
+
+
+def _run_draft_section(
+    project_slug: str,
+    section_id: str,
+    action_input: dict,
+) -> dict:
+    """根据 sources 摘录调用模型起草一节并落盘。"""
+    title = _section_title(project_slug, section_id)
+    source_ids = list(action_input.get("source_ids") or [])[:MAX_EXCERPT_SOURCES]
+    excerpts = _collect_excerpts(project_slug, source_ids)
+    if not excerpts:
+        return {
+            "last_observation": (
+                f"无法起草 {section_id}：需要 1～{MAX_EXCERPT_SOURCES} 篇有效摘录"
+                "（先确认文献并抓取 sources）"
+            ),
+        }
+
+    brief = load_brief(project_slug)
+    try:
+        drafted = _draft_section_text(
+            title=title,
+            excerpts=excerpts,
+            kind=brief.kind if brief else "report",
+            audience=brief.audience if brief else "",
+            constraints=list(brief.constraints) if brief else [],
+        )
+    except LLMError as exc:
+        return {"last_observation": f"起草失败（模型错误）: {exc}"}
+
+    drafted = (drafted or "").strip()
+    if not drafted:
+        return {"last_observation": f"起草失败: 模型未返回正文（{section_id}）"}
+
+    gist = _gist_from_text(drafted)
+    save_section(project_slug, section_id, drafted + "\n", status="draft", gist=gist)
 
     try:
         export_docx(project_slug)
     except FileNotFoundError:
         pass
 
-    return {"last_observation": obs}
+    return {"last_observation": f"已起草节: {section_id}"}
 
 
 def _run_revise_section(
-    state: GraphState,
     project_slug: str,
     section_id: str,
     action_input: dict,
@@ -288,6 +322,53 @@ def _collect_excerpts(project_slug: str, source_ids: list[str]) -> list[tuple[st
     return collected
 
 
+def _format_excerpt_block(excerpts: list[tuple[str, str]]) -> str:
+    if not excerpts:
+        return "（本轮未提供摘录；不要新增无依据的断言。）"
+    return "\n\n".join(f"### {sid}\n\n{text}" for sid, text in excerpts)
+
+
+def _gist_from_text(text: str, limit: int = 20) -> str:
+    for line in text.splitlines():
+        cleaned = line.strip().lstrip("#").strip()
+        if cleaned:
+            return cleaned[:limit]
+    return text.strip()[:limit]
+
+
+def _draft_section_text(
+    *,
+    title: str,
+    excerpts: list[tuple[str, str]],
+    kind: str,
+    audience: str,
+    constraints: list[str],
+) -> str:
+    """调用 chat() 根据摘录起草一节；只返回正文。"""
+    constraint_line = "、".join(constraints) if constraints else "无"
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是文稿起草助手。只根据提供的文献摘录写这一节的 Markdown 正文。"
+                "每一段主张都要能对上至少一篇摘录；没有摘录支撑的断言不要写。"
+                "不要编造文献或页码。不要输出节标题、前言或写作说明，只输出正文。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"文稿种类: {kind}\n"
+                f"读者: {audience or '未指定'}\n"
+                f"约束: {constraint_line}\n"
+                f"节标题: {title}\n\n"
+                f"相关摘录:\n{_format_excerpt_block(excerpts)}\n"
+            ),
+        },
+    ]
+    return chat(messages, temperature=0.4).strip()
+
+
 def _revise_section_text(
     *,
     title: str,
@@ -296,13 +377,6 @@ def _revise_section_text(
     excerpts: list[tuple[str, str]],
 ) -> str:
     """调用 chat() 按反馈改写一节；只返回正文。"""
-    if excerpts:
-        excerpt_block = "\n\n".join(
-            f"### {sid}\n\n{text}" for sid, text in excerpts
-        )
-    else:
-        excerpt_block = "（本轮未提供摘录；不要新增无依据的断言。）"
-
     messages = [
         {
             "role": "system",
@@ -319,7 +393,7 @@ def _revise_section_text(
                 f"节标题: {title}\n\n"
                 f"用户反馈:\n{feedback}\n\n"
                 f"现有正文:\n{content.strip() or '（空）'}\n\n"
-                f"相关摘录:\n{excerpt_block}\n"
+                f"相关摘录:\n{_format_excerpt_block(excerpts)}\n"
             ),
         },
     ]

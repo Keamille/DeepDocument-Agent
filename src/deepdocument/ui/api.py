@@ -4,9 +4,11 @@
 pywebview 的 js_api，连接前端和图。
 """
 
-from pathlib import Path
+from __future__ import annotations
 
+from deepdocument.document import store
 from deepdocument.graph.builder import build_graph
+from deepdocument.memory.profile import profile_to_prompt
 
 
 class WindowAPI:
@@ -23,12 +25,7 @@ class WindowAPI:
         self.pending_confirmation = None
 
     def _ensure_graph(self, project_slug: str):
-        """
-        项目切换时才重新编译图
-
-        Args:
-            project_slug: 项目 slug
-        """
+        """项目切换时才重新编译图。"""
         if not project_slug or project_slug == self.current_project:
             return
         self.current_project = project_slug
@@ -37,41 +34,85 @@ class WindowAPI:
 
     def list_projects(self) -> list[dict]:
         """
-        列出所有项目
+        列出 projects/ 下已有项目。
 
         Returns:
-            项目列表，每项包含 slug 和 title
+            [{slug, title, kind}]，按 slug 排序；title 来自 brief.md，缺省用 slug
         """
-        projects_dir = Path("projects")
-        if not projects_dir.exists():
+        root = store.PROJECTS_ROOT
+        if not root.exists():
             return []
 
-        result = []
-        for proj_dir in projects_dir.iterdir():
-            if not proj_dir.is_dir():
+        result: list[dict] = []
+        for proj_dir in root.iterdir():
+            if not proj_dir.is_dir() or proj_dir.name.startswith("."):
                 continue
-            # TODO: 从 brief.md 读取 title
-            result.append({"slug": proj_dir.name, "title": proj_dir.name})
+            slug = proj_dir.name
+            brief = store.load_brief(slug)
+            result.append(
+                {
+                    "slug": slug,
+                    "title": (brief.title if brief and brief.title else slug),
+                    "kind": brief.kind if brief else "report",
+                }
+            )
         return sorted(result, key=lambda p: p["slug"])
 
     def load_project(self, slug: str) -> dict:
         """
-        加载项目数据
+        加载项目右栏数据：大纲、各节、已确认文献、全局画像。
 
-        Args:
-            slug: 项目 slug
-
-        Returns:
-            项目数据字典
+        Raises:
+            FileNotFoundError: 项目目录不存在
         """
+        slug = (slug or "").strip()
+        if not slug:
+            raise ValueError("project slug 不能为空")
+
+        root = store.project_dir(slug)
+        if not root.is_dir():
+            raise FileNotFoundError(f"项目不存在: {slug}")
+
         self._ensure_graph(slug)
 
-        # TODO: 从磁盘读取 outline, sections, literature, profile
+        meta = store.load_meta(slug)
+        outline = store.load_outline(slug)
+        sections = []
+        for sec in store.get_sections(slug):
+            sections.append(
+                {
+                    "id": sec.id,
+                    "title": sec.title,
+                    "status": sec.status,
+                    "gist": sec.gist,
+                    "content": store.load_section(slug, sec.id),
+                }
+            )
+
+        literature = []
+        for lit in store.load_literature(slug, status="accepted"):
+            literature.append(
+                {
+                    "id": lit.id,
+                    "title": lit.title,
+                    "authors": list(lit.authors or []),
+                    "year": lit.year,
+                    "venue": lit.venue,
+                    "url": lit.url,
+                    "content_source": lit.content_source,
+                }
+            )
+
+        brief = store.load_brief(slug)
         return {
-            "outline": [],
-            "sections": [],
-            "literature": [],
-            "profile": "",
+            "slug": slug,
+            "title": brief.title if brief else slug,
+            "kind": brief.kind if brief else "report",
+            "cursor": meta.get("cursor") or "",
+            "outline": outline,
+            "sections": sections,
+            "literature": literature,
+            "profile": profile_to_prompt(),
         }
 
     def send_message(self, message: str, project_slug: str) -> dict:
