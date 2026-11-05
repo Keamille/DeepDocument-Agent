@@ -111,25 +111,46 @@ function showConfirmation(data) {
 
 // 渲染文献卡
 function renderLiteratureCard(items) {
-    return items.map((item, idx) => `
+    return items.map((item) => `
         <div>
-            <input type="checkbox" id="lit-${idx}" checked>
-            <label for="lit-${idx}">
-                ${item.title} (${item.year})
-                ${item.available ? '' : '<span style="color: var(--accent-warm);">无可用文本</span>'}
+            <input type="checkbox" class="lit-check" data-id="${item.id}" ${item.available === false ? '' : 'checked'}>
+            <label>
+                ${item.title} (${item.year || ''})
+                ${item.available === false ? '<span style="color: var(--accent-warm);">无可用文本</span>' : ''}
             </label>
         </div>
     `).join('');
 }
 
+function collectConfirmPayload() {
+    const checks = document.querySelectorAll('.lit-check');
+    if (!checks.length) {
+        return {};
+    }
+    const selected_ids = [];
+    checks.forEach((el) => {
+        if (el.checked && el.dataset.id) {
+            selected_ids.push(el.dataset.id);
+        }
+    });
+    return { selected_ids };
+}
+
 // 确认动作
 async function confirmAction(accept) {
+    const payload = collectConfirmPayload();
     const modal = document.getElementById('confirmation-modal');
     modal.style.display = 'none';
 
     try {
-        const result = await pywebview.api.confirm_action(accept);
+        const result = await pywebview.api.confirm_action(accept, payload);
         handleResponse(result);
+        if (result.type === 'update') {
+            refreshProject();
+            if (result.content) {
+                appendMessage('assistant', result.content);
+            }
+        }
     } catch (error) {
         appendMessage('assistant', `错误: ${error}`);
     }
