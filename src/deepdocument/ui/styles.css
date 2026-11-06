@@ -30,6 +30,47 @@ body {
     height: 100vh;
 }
 
+.project-select {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.attach-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.hint, .meta {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.warn {
+    color: var(--accent-warm);
+}
+
+.lit-item, .skill-item {
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal label {
+    display: block;
+    margin: 8px 0;
+}
+
+.modal input, .modal select {
+    width: 100%;
+    margin-top: 4px;
+}
+
 /* 左栏 */
 .left-pane {
     flex: 1;

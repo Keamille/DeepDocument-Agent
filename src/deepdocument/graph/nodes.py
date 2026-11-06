@@ -13,13 +13,14 @@ from datetime import datetime, timezone
 from langgraph.types import interrupt
 
 from deepdocument.document.exporter import export_docx
-from deepdocument.document.model import Decision
+from deepdocument.document.model import Decision, Literature
 from deepdocument.document.store import (
     append_decision,
     load_brief,
     load_meta,
     load_section,
     load_source,
+    save_literature,
     save_outline,
     save_section,
     update_section_meta,
@@ -133,6 +134,27 @@ def search_literature(state: GraphState) -> dict:
 
     selected_ids = set(selection.get("selected_ids") or [])
     project_slug = state["project_slug"]
+
+    # 先整表写入 accepted / rejected，再抓取勾选项摘录
+    batch: list[Literature] = []
+    for item in results:
+        accepted = item["id"] in selected_ids
+        batch.append(
+            Literature(
+                id=item["id"],
+                title=item.get("title") or item["id"],
+                authors=list(item.get("authors") or []),
+                year=item.get("year"),
+                status="accepted" if accepted else "rejected",
+                openalex_id=item.get("openalex_id"),
+                doi=item.get("doi"),
+                venue=item.get("venue"),
+                url=item.get("url"),
+                abstract=item.get("abstract"),
+            )
+        )
+    save_literature(project_slug, batch)
+
     fetched = 0
     for item in results:
         if item["id"] not in selected_ids:
@@ -154,13 +176,16 @@ def search_literature(state: GraphState) -> dict:
         )
         fetched += 1
 
+    rejected = len(results) - len(selected_ids & {r["id"] for r in results})
     try:
         export_docx(project_slug)
     except FileNotFoundError:
         pass
 
     return {
-        "last_observation": f"已确认并抓取 {fetched} 条文献摘录",
+        "last_observation": (
+            f"已确认并抓取 {fetched} 条文献摘录，拒绝 {rejected} 条"
+        ),
         "pending_confirmation": None,
     }
 

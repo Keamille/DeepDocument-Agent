@@ -32,6 +32,10 @@ from deepdocument.document.store import (
     update_section_meta,
 )
 from deepdocument.document.exporter import export_docx
+from deepdocument.document.template_outline import (
+    extract_outline_from_template,
+    suggest_outline,
+)
 
 __all__ = [
     "Brief",
@@ -44,7 +48,9 @@ __all__ = [
     "append_literature",
     "create_project",
     "export_docx",
+    "extract_outline_from_template",
     "get_sections",
+    "suggest_outline",
     "list_source_ids",
     "load_brief",
     "load_decisions",

@@ -12,6 +12,7 @@ from deepdocument.document.store import (
     load_literature,
     load_meta,
     load_outline,
+    load_source,
 )
 
 # 模型上下文下限与提示总预算（见 docs/memory.md）
@@ -49,6 +50,7 @@ def build_prompt(
     recalled_skills: list[str],
     *,
     observation: str = "",
+    source_ids: list[str] | None = None,
 ) -> str:
     """
     组装本轮提示
@@ -57,6 +59,7 @@ def build_prompt(
         project_slug: 项目 slug
         recalled_skills: 召回的 skill 名称列表（最多 2 个）
         observation: 上一轮 Observation，写入 observation 切片
+        source_ids: 本轮要用的文献 id（最多 3）；空则摘录切片仍写占位说明
     """
     from deepdocument.memory.profile import profile_to_prompt
     from deepdocument.skills.registry import scan_skills
@@ -113,7 +116,7 @@ def build_prompt(
 
     sections.append(
         truncate_to_budget(
-            f"# 摘录\n\n（按需装入，最多 {MAX_EXCERPT_SOURCES} 篇，每篇 ≤ {EXCERPT_PER_SOURCE} token）",
+            _format_excerpts_slice(project_slug, source_ids),
             BUDGET["excerpts"],
         )
     )
@@ -149,6 +152,29 @@ def build_prompt(
     )
 
     return "\n\n".join(sections)
+
+
+def _format_excerpts_slice(
+    project_slug: str,
+    source_ids: list[str] | None,
+) -> str:
+    """按 source_ids 装入摘录；未指定时保留占位（choose_action 轮尚无具体 id）。"""
+    ids = [sid for sid in (source_ids or []) if sid][:MAX_EXCERPT_SOURCES]
+    if not ids:
+        return (
+            f"# 摘录\n\n（按需装入，最多 {MAX_EXCERPT_SOURCES} 篇，"
+            f"每篇 ≤ {EXCERPT_PER_SOURCE} token；起草/修订时由节点按 source_ids 填入）"
+        )
+
+    blocks: list[str] = ["# 摘录\n"]
+    for sid in ids:
+        source = load_source(project_slug, sid)
+        if source is None or not source.excerpt.strip():
+            blocks.append(f"## {sid}\n\n（无可用摘录）\n")
+            continue
+        excerpt = truncate_to_budget(source.excerpt.strip(), EXCERPT_PER_SOURCE)
+        blocks.append(f"## {sid}\n\n{excerpt}\n")
+    return "\n".join(blocks)
 
 
 def estimate_tokens(text: str) -> int:

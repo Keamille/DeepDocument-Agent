@@ -16,6 +16,10 @@ from deepdocument.memory.profile import (
     save_profile,
     update_profile,
 )
+from deepdocument.memory.snapshots import (
+    capture_file_snapshots,
+    detect_external_changes,
+)
 
 __all__ = [
     "BUDGET",
@@ -24,6 +28,8 @@ __all__ = [
     "MIN_CONTEXT_TOKENS",
     "PROMPT_TOKEN_BUDGET",
     "build_prompt",
+    "capture_file_snapshots",
+    "detect_external_changes",
     "estimate_tokens",
     "load_profile",
     "profile_to_prompt",

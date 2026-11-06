@@ -14,52 +14,55 @@
                 <h1>DeepDocument</h1>
                 <div class="project-select">
                     <select id="project-selector">
-                        <option value="">新建项目</option>
+                        <option value="">选择项目…</option>
                     </select>
+                    <button id="new-project-btn" class="secondary-btn" type="button">新建</button>
+                    <button id="export-btn" class="secondary-btn" type="button">导出 Word</button>
                 </div>
             </div>
 
-            <div class="messages" id="messages">
-                <!-- 消息动态插入 -->
-            </div>
+            <div class="messages" id="messages"></div>
 
             <div class="input-area">
-                <div class="context-indicator" id="context-indicator">
-                    <!-- 修订某节时显示 📍 正在修订: {section.title} -->
+                <div class="context-indicator" id="context-indicator"></div>
+                <div class="attach-row">
+                    <input type="file" id="attach-input" />
+                    <span class="hint">.docx → 模板；其它 → 本地文献（骨架）</span>
                 </div>
-                <textarea id="user-input" placeholder="输入消息..." rows="3"></textarea>
+                <textarea id="user-input" placeholder="输入消息… 可用「改第 3 节:…」" rows="3"></textarea>
                 <button id="send-btn" class="primary-btn">发送</button>
             </div>
         </div>
 
-        <!-- 右栏：Markdown 预览 -->
+        <!-- 右栏 -->
         <div class="right-pane">
             <div class="tabs">
                 <button class="tab active" data-tab="outline">大纲</button>
                 <button class="tab" data-tab="sections">正文</button>
                 <button class="tab" data-tab="literature">文献</button>
                 <button class="tab" data-tab="profile">画像</button>
+                <button class="tab" data-tab="skills">Skills</button>
             </div>
 
             <div class="tab-content active" id="tab-outline">
                 <div id="outline-view"></div>
             </div>
-
             <div class="tab-content" id="tab-sections">
                 <div id="sections-view"></div>
             </div>
-
             <div class="tab-content" id="tab-literature">
                 <div id="literature-view"></div>
             </div>
-
             <div class="tab-content" id="tab-profile">
                 <div id="profile-view"></div>
+            </div>
+            <div class="tab-content" id="tab-skills">
+                <div id="skills-view"></div>
             </div>
         </div>
     </div>
 
-    <!-- 确认卡模态框 -->
+    <!-- 确认卡 -->
     <div class="modal" id="confirmation-modal" style="display: none;">
         <div class="modal-content">
             <h2 id="modal-title">确认</h2>
@@ -67,6 +70,26 @@
             <div class="modal-actions">
                 <button id="modal-confirm" class="primary-btn">同意</button>
                 <button id="modal-cancel" class="secondary-btn">拒绝</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建项目（骨架） -->
+    <div class="modal" id="new-project-modal" style="display: none;">
+        <div class="modal-content">
+            <h2>新建项目</h2>
+            <label>题目 <input id="new-title" type="text" /></label>
+            <label>种类
+                <select id="new-kind">
+                    <option value="summary">总结</option>
+                    <option value="report" selected>报告</option>
+                    <option value="paper">论文</option>
+                </select>
+            </label>
+            <label>读者 <input id="new-audience" type="text" /></label>
+            <div class="modal-actions">
+                <button id="new-project-ok" class="primary-btn">创建</button>
+                <button id="new-project-cancel" class="secondary-btn">取消</button>
             </div>
         </div>
     </div>
