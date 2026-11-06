@@ -118,7 +118,7 @@ content_source: fulltext
 - 状态为 `outlined`、`draft`、`accepted` 的节按顺序写入。
 - `draft` 的标题标明草稿。
 - `empty` 的节不写入。
-- 文末参考文献只列 `accepted` 文献。第一版按作者姓氏字母排序后做简易著录（作者、年、题名、出处、DOI/URL）；`citation_style`（`APA` / `GB/T 7714-2015`）预留字段，细规则后续再分岔，不假装已实现完整 APA 7 / GB。
+- 文末参考文献只列 `accepted` 文献，按作者姓氏字母排序。按 `brief.md` 的 `citation_style` 分岔：`APA`（默认）与含 `GB`/`7714` 的国标简化著录；均非官方完整规范，够交稿可读即可。
 - 同一路径每次覆盖。
 - 没有模板时使用空白文档。
 - 格式是 `.docx`，不生成旧版二进制 `.doc`。

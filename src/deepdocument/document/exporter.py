@@ -118,24 +118,51 @@ def _add_references(
 
 
 def _format_citation(lit: Literature, style: str) -> str:
-    """简易著录：作者、年、题名、出处、DOI/URL。
+    """按 citation_style 做可读著录（简化 APA / GB，非官方完整规范）。"""
+    normalized = (style or "APA").strip().upper()
+    if "GB" in normalized or "7714" in normalized:
+        return _format_citation_gb(lit)
+    return _format_citation_apa(lit)
 
-    不是完整 APA 7 / GB/T 7714；style 仅预留，第一版忽略。
-    """
+
+def _format_citation_apa(lit: Literature) -> str:
     authors = lit.authors or ["佚名"]
-    if len(authors) <= 3:
-        authors_str = ", ".join(authors)
+    if len(authors) == 1:
+        authors_str = authors[0]
+    elif len(authors) == 2:
+        authors_str = f"{authors[0]} & {authors[1]}"
+    elif len(authors) <= 20:
+        authors_str = ", ".join(authors[:-1]) + f", & {authors[-1]}"
     else:
-        authors_str = ", ".join(authors[:3]) + ", et al."
+        authors_str = ", ".join(authors[:19]) + ", ... " + authors[-1]
 
     year = lit.year if lit.year is not None else "n.d."
-    parts = [f"{authors_str}. ({year}). {lit.title}."]
+    parts = [f"{authors_str} ({year}). {lit.title}."]
     if lit.venue:
         parts.append(f" {lit.venue}.")
     if lit.doi:
         parts.append(f" https://doi.org/{lit.doi}")
     elif lit.url:
         parts.append(f" {lit.url}")
-
-    _ = style  # 预留：APA / GB 细规则后续分岔
     return "".join(parts)
+
+
+def _format_citation_gb(lit: Literature) -> str:
+    """GB/T 7714 风格简化：作者. 题名[J]. 出处, 年."""
+    authors = lit.authors or ["佚名"]
+    if len(authors) <= 3:
+        authors_str = ", ".join(authors)
+    else:
+        authors_str = ", ".join(authors[:3]) + ", 等"
+
+    year = lit.year if lit.year is not None else "[出版年不详]"
+    parts = [f"{authors_str}. {lit.title}[J]."]
+    if lit.venue:
+        parts.append(f" {lit.venue},")
+    parts.append(f" {year}.")
+    if lit.doi:
+        parts.append(f" DOI: {lit.doi}.")
+    elif lit.url:
+        parts.append(f" {lit.url}.")
+    return "".join(parts)
+
