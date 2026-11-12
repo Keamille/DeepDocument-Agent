@@ -25,8 +25,8 @@ from deepdocument.memory.profile import (
     save_profile,
 )
 from deepdocument.memory.snapshots import (
+    build_conflict_report,
     capture_file_snapshots,
-    detect_external_changes,
 )
 from deepdocument.skills.registry import scan_skills
 
@@ -162,6 +162,7 @@ class WindowAPI:
             )
 
         brief = store.load_brief(slug)
+        profile = load_profile()
         return {
             "slug": slug,
             "title": brief.title if brief else slug,
@@ -170,7 +171,14 @@ class WindowAPI:
             "outline": outline,
             "sections": sections,
             "literature": literature,
-            "profile": profile_to_prompt(),
+            "profile": profile_to_prompt(profile),
+            "profile_data": {
+                "language": profile.language,
+                "tone": profile.tone,
+                "structure": profile.structure,
+                "citation": profile.citation,
+                "rejects": list(profile.rejects),
+            },
             "skills": self.list_skills(),
             "pending_confirmation": self.pending_confirmation,
         }
@@ -331,13 +339,29 @@ class WindowAPI:
         if not self._graph or not self.current_project:
             return {"type": "message", "content": "没有打开的项目"}
 
-        # 骨架：恢复前检测外部修改（冲突 UI TODO）
-        changed = detect_external_changes(self.current_project, self.file_snapshots)
-        if changed:
-            # 暂不阻断，仅写入 observation 侧通道；完整冲突卡后续做
-            pass
+        extra = dict(payload or {})
+        resolution = (extra.pop("conflict_resolution", None) or "").strip()
 
-        resume = self._build_resume_payload(bool(accept), payload)
+        conflict = build_conflict_report(
+            self.current_project,
+            self.file_snapshots,
+            pending_confirmation=self.pending_confirmation,
+        )
+        if conflict and resolution not in ("keep_disk", "proceed"):
+            if resolution == "abort":
+                return {
+                    "type": "confirmation",
+                    "data": self.pending_confirmation,
+                    "content": "已取消确认，文稿保持磁盘现状",
+                }
+            # 未选择如何处理冲突：把冲突卡交给窗口
+            return {"type": "conflict", "data": conflict}
+
+        if conflict and resolution in ("keep_disk", "proceed"):
+            # 以当前磁盘为准，刷新快照后再 resume
+            self.file_snapshots = capture_file_snapshots(self.current_project)
+
+        resume = self._build_resume_payload(bool(accept), extra)
         card = self.pending_confirmation
         self.pending_confirmation = None
 

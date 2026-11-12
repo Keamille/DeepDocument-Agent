@@ -269,3 +269,68 @@ body {
 #sections-view p {
     margin-bottom: 1rem;
 }
+
+.section.active-section {
+    outline: 1px solid var(--accent-cool);
+    border-radius: var(--radius);
+    padding: 0.5rem;
+}
+
+.card-edit, #outline-edit, #skill-edit, #skill-name-edit {
+    width: 100%;
+    margin-top: 0.5rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 0.5rem;
+    font-family: inherit;
+}
+
+.diff-preview {
+    margin-top: 0.75rem;
+    opacity: 0.75;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+.reject-item, .skill-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+}
+
+.skill-desc {
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.skill-desc-edit textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 0.5rem;
+}
+
+#context-indicator {
+    cursor: pointer;
+    min-height: 1.2em;
+    color: var(--accent-cool);
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+.lit-label {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
